@@ -148,18 +148,19 @@ st.title('Unlock Insights: Advanced Forecasting Models at Your Fingertips')
 col1,col2=st.columns(2)
 with col1:
     input=st.text_input('Write the IDX of the company')
+    title=str(input)
     button_scrap = st.button('Scrap Data')
-        if button_scrap:
-            title=input
-            st.session_state['data_perusahaan'] = gabung_data(title)
-            
+    if button_scrap:
+        title=str(input)
+        st.session_state['data_perusahaan'] = gabung_data(title)
+
 with col2:
     if 'data_perusahaan' in st.session_state and st.session_state['data_perusahaan'] is not None:
         # Asumsi 'download_link' adalah fungsi yang Anda definisikan untuk mengunduh data
         download_link(st.session_state['data_perusahaan'])
         st.write(st.session_state['data_perusahaan'])
    
-if 'data_perusahaan' in st.session_state and st.session_state['data_perusahaan'] is not None:
+if title:
     plotdf = gabung_data(title)
     fig = px.line(plotdf, x='Date', y='Close', labels={'x': 'Date', 'y': 'Close Price'}, title=f"Stock Price {title}")
     fig.update_xaxes(showgrid=False)
@@ -172,6 +173,7 @@ if 'data_perusahaan' in st.session_state and st.session_state['data_perusahaan']
     
     
 # convert an array of values into a dataset matrix
+@st.cache_data
 def create_dataset(dataset, time_step=1):
     dataX, dataY = [], []
     for i in range(len(dataset)-time_step-1):
@@ -191,7 +193,6 @@ class StreamlitProgressCallback(Callback):
         progress = (epoch + 1) / self.max_epochs
         self.progress_bar.progress(progress)
         
-@chace_resouces
 def buat_model_harian():
     # normalisasi data
     global model_harian
@@ -301,7 +302,7 @@ def buat_model_bulanan():
     
     
     # Jumlah epoch untuk training
-    max_epochs = 5
+    max_epochs = 20
 
     # Buat instance callback Streamlit
     progress_callback = StreamlitProgressCallback(max_epochs)
@@ -367,131 +368,131 @@ with col2:
     if check_model_2:
         buat_model_bulanan()
 
-# def prediksi_harga_saham_nhari(nhari):
-#     time_step = 15
-#     df=gabung_data(title).copy()
-#     scaler=MinMaxScaler(feature_range=(0,1))
-#     df["norm"]=scaler.fit_transform(df[["Close"]])
+def prediksi_harga_saham_nhari(nhari):
+    time_step = 15
+    df=gabung_data(title).copy()
+    scaler=MinMaxScaler(feature_range=(0,1))
+    df["norm"]=scaler.fit_transform(df[["Close"]])
     
-#     x_input=df[["norm"]][len(df)-time_step:].values.reshape(1,-1)
-#     temp_input=list(x_input)
-#     temp_input=temp_input[0].tolist()
+    x_input=df[["norm"]][len(df)-time_step:].values.reshape(1,-1)
+    temp_input=list(x_input)
+    temp_input=temp_input[0].tolist()
     
-#     #prediksi sebanyak data baru
-#     from numpy import array
+    #prediksi sebanyak data baru
+    from numpy import array
 
-#     lst_output=[]
-#     n_steps=time_step
-#     i=0
-#     pred_days = nhari
-#     while(i<pred_days):
+    lst_output=[]
+    n_steps=time_step
+    i=0
+    pred_days = nhari
+    while(i<pred_days):
         
-#         if(len(temp_input)>time_step):
+        if(len(temp_input)>time_step):
             
-#             x_input=np.array(temp_input[1:])
-#             #print("{} day input {}".format(i,x_input))
-#             x_input = x_input.reshape(1,-1)
-#             x_input = x_input.reshape((1, n_steps, 1))
+            x_input=np.array(temp_input[1:])
+            #print("{} day input {}".format(i,x_input))
+            x_input = x_input.reshape(1,-1)
+            x_input = x_input.reshape((1, n_steps, 1))
             
-#             yhat = model_harian.predict(x_input, verbose=0)
-#             #print("{} day output {}".format(i,yhat))
-#             temp_input.extend(yhat[0].tolist())
-#             temp_input=temp_input[1:]
-#             #print(temp_input)
+            yhat = model_harian.predict(x_input, verbose=0)
+            #print("{} day output {}".format(i,yhat))
+            temp_input.extend(yhat[0].tolist())
+            temp_input=temp_input[1:]
+            #print(temp_input)
         
-#             lst_output.extend(yhat.tolist())
-#             i=i+1
+            lst_output.extend(yhat.tolist())
+            i=i+1
             
-#         else:
+        else:
             
-#             x_input = x_input.reshape((1, n_steps,1))
-#             yhat = model_harian.predict(x_input, verbose=0)
-#             temp_input.extend(yhat[0].tolist())
+            x_input = x_input.reshape((1, n_steps,1))
+            yhat = model_harian.predict(x_input, verbose=0)
+            temp_input.extend(yhat[0].tolist())
             
-#             lst_output.extend(yhat.tolist())
-#             i=i+1
+            lst_output.extend(yhat.tolist())
+            i=i+1
             
-#     # Konversi prediksi menjadi format yang sesuai dan menambahkannya ke DataFrame
-#     lst_output = scaler.inverse_transform(np.array(lst_output).reshape(-1,1)).reshape(1,-1).tolist()[0]
+    # Konversi prediksi menjadi format yang sesuai dan menambahkannya ke DataFrame
+    lst_output = scaler.inverse_transform(np.array(lst_output).reshape(-1,1)).reshape(1,-1).tolist()[0]
     
-#     #masukan hasil ke csv
-#     now = datetime.now()
-#     one_day_before = now
-#     one_day_until=  now + timedelta(days=nhari-1)
-#     date_rng=pd.date_range(start=one_day_before, end=one_day_until, freq='B')
+    #masukan hasil ke csv
+    now = datetime.now()
+    one_day_before = now
+    one_day_until=  now + timedelta(days=nhari-1)
+    date_rng=pd.date_range(start=one_day_before, end=one_day_until, freq='B')
 
-#     data_baru=pd.DataFrame(date_rng, columns=['tanggal'])
-#     data_baru["tanggal"]=pd.to_datetime(data_baru["tanggal"])
-#     data_baru['prediksi']=lst_output
+    data_baru=pd.DataFrame(date_rng, columns=['tanggal'])
+    data_baru["tanggal"]=pd.to_datetime(data_baru["tanggal"])
+    data_baru['prediksi']=lst_output
     
 
-#     return data_baru
+    return data_baru
 
-# def prediksi_harga_saham_nbulan(nbulan):
-#     data_model_bulanan=gabung_data(title).copy()
-#     data_model_bulanan["Close"]=data_model_bulanan["Close"].astype(float)
-#     data_model_bulanan["Date"]=data_model_bulanan["Date"].astype(str)
-#     data_model_bulanan["Date"]=[i[:7] for i in data_model_bulanan["Date"]]
-#     data_model_bulanan=data_model_bulanan.groupby("Date")["Close"].mean().reset_index()
+def prediksi_harga_saham_nbulan(nbulan):
+    data_model_bulanan=gabung_data(title).copy()
+    data_model_bulanan["Close"]=data_model_bulanan["Close"].astype(float)
+    data_model_bulanan["Date"]=data_model_bulanan["Date"].astype(str)
+    data_model_bulanan["Date"]=[i[:7] for i in data_model_bulanan["Date"]]
+    data_model_bulanan=data_model_bulanan.groupby("Date")["Close"].mean().reset_index()
     
-#     scaler=MinMaxScaler(feature_range=(0,1))
-#     data_model_bulanan["norm"]=scaler.fit_transform(data_model_bulanan[["Close"]])
-#     time_step = 7
+    scaler=MinMaxScaler(feature_range=(0,1))
+    data_model_bulanan["norm"]=scaler.fit_transform(data_model_bulanan[["Close"]])
+    time_step = 7
     
-#     x_input=data_model_bulanan[["norm"]][len(data_model_bulanan)-time_step:].values.reshape(1,-1)
-#     temp_input=list(x_input)
-#     temp_input=temp_input[0].tolist()
+    x_input=data_model_bulanan[["norm"]][len(data_model_bulanan)-time_step:].values.reshape(1,-1)
+    temp_input=list(x_input)
+    temp_input=temp_input[0].tolist()
     
-#     #prediksi sebanyak data baru
-#     from numpy import array
+    #prediksi sebanyak data baru
+    from numpy import array
 
-#     lst_output=[]
-#     n_steps=time_step
-#     i=0
-#     pred_days = nbulan
-#     while(i<pred_days):
+    lst_output=[]
+    n_steps=time_step
+    i=0
+    pred_days = nbulan
+    while(i<pred_days):
         
-#         if(len(temp_input)>time_step):
+        if(len(temp_input)>time_step):
             
-#             x_input=np.array(temp_input[1:])
-#             #print("{} day input {}".format(i,x_input))
-#             x_input = x_input.reshape(1,-1)
-#             x_input = x_input.reshape((1, n_steps, 1))
+            x_input=np.array(temp_input[1:])
+            #print("{} day input {}".format(i,x_input))
+            x_input = x_input.reshape(1,-1)
+            x_input = x_input.reshape((1, n_steps, 1))
             
-#             yhat = model_bulanan.predict(x_input, verbose=0)
-#             #print("{} day output {}".format(i,yhat))
-#             temp_input.extend(yhat[0].tolist())
-#             temp_input=temp_input[1:]
-#             #print(temp_input)
+            yhat = model_bulanan.predict(x_input, verbose=0)
+            #print("{} day output {}".format(i,yhat))
+            temp_input.extend(yhat[0].tolist())
+            temp_input=temp_input[1:]
+            #print(temp_input)
         
-#             lst_output.extend(yhat.tolist())
-#             i=i+1
+            lst_output.extend(yhat.tolist())
+            i=i+1
             
-#         else:
+        else:
             
-#             x_input = x_input.reshape((1, n_steps,1))
-#             yhat = model_bulanan.predict(x_input, verbose=0)
-#             temp_input.extend(yhat[0].tolist())
+            x_input = x_input.reshape((1, n_steps,1))
+            yhat = model_bulanan.predict(x_input, verbose=0)
+            temp_input.extend(yhat[0].tolist())
             
-#             lst_output.extend(yhat.tolist())
-#             i=i+1
+            lst_output.extend(yhat.tolist())
+            i=i+1
             
-#         # Konversi prediksi menjadi format yang sesuai dan menambahkannya ke DataFrame
-#         lst_output = scaler.inverse_transform(np.array(lst_output).reshape(-1,1)).reshape(1,-1).tolist()[0]
+        # Konversi prediksi menjadi format yang sesuai dan menambahkannya ke DataFrame
+        lst_output = scaler.inverse_transform(np.array(lst_output).reshape(-1,1)).reshape(1,-1).tolist()[0]
         
-#         #masukan hasil ke csv
-#         now=datetime.now()
-#         one_day_before=now-timedelta(days=1)
-#         one_day_until=  now + timedelta(days=days_ahead-1)
-#         date_rng=pd.date_range(start=one_day_before, end=one_day_until, freq='B')
-#         data_baru=pd.DataFrame(date_rng, columns=['tanggal'])
-#         data_baru["tanggal"]=pd.to_datetime(data_baru["tanggal"])
-#         data_baru["prediksi"]=data_baru["prediksi"].astype(float)
-#         data_baru["tanggal"]=data_baru["tanggal"].astype(str)
-#         data_baru["tanggal"]=[i[:7] for i in data_baru["tanggal"]]
-#         data_baru=data_baru.groupby("Date")["prediksi"].mean().reset_index()
-#         data_baru['prediksi']=lst_output
-#     return data_baru
+        #masukan hasil ke csv
+        now=datetime.now()
+        one_day_before=now-timedelta(days=1)
+        one_day_until=  now + timedelta(days=days_ahead-1)
+        date_rng=pd.date_range(start=one_day_before, end=one_day_until, freq='B')
+        data_baru=pd.DataFrame(date_rng, columns=['tanggal'])
+        data_baru["tanggal"]=pd.to_datetime(data_baru["tanggal"])
+        data_baru["prediksi"]=data_baru["prediksi"].astype(float)
+        data_baru["tanggal"]=data_baru["tanggal"].astype(str)
+        data_baru["tanggal"]=[i[:7] for i in data_baru["tanggal"]]
+        data_baru=data_baru.groupby("Date")["prediksi"].mean().reset_index()
+        data_baru['prediksi']=lst_output
+    return data_baru
 
 # col1,col2=st.columns(2)
 # with col1:
