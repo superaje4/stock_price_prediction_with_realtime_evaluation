@@ -148,10 +148,10 @@ st.title('Unlock Insights: Advanced Forecasting Models at Your Fingertips')
 col1,col2=st.columns(2)
 with col1:
     input=st.text_input('Write the IDX of the company')
-    button_scrap=st.button("Scrap Data")
-    if button_scrap:
-        title=input
-        st.session_state['data_perusahaan'] = gabung_data(title)
+    button_scrap = st.button('Scrap Data')
+        if button_scrap:
+            title=input
+            st.session_state['data_perusahaan'] = gabung_data(title)
             
 with col2:
     if 'data_perusahaan' in st.session_state and st.session_state['data_perusahaan'] is not None:
@@ -191,7 +191,7 @@ class StreamlitProgressCallback(Callback):
         progress = (epoch + 1) / self.max_epochs
         self.progress_bar.progress(progress)
         
-
+@chace_resouces
 def buat_model_harian():
     # normalisasi data
     global model_harian
