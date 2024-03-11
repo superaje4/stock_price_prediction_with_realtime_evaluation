@@ -192,7 +192,8 @@ class StreamlitProgressCallback(Callback):
         # Update progress bar
         progress = (epoch + 1) / self.max_epochs
         self.progress_bar.progress(progress)
-        
+
+@st.cache_resource
 def buat_model_harian():
     # normalisasi data
     global model_harian
@@ -273,6 +274,7 @@ def buat_model_harian():
     st.plotly_chart(fig)
 
 #untuk bulanan
+@st.cache_resource
 def buat_model_bulanan():
     # normalisasi data
     global model_bulanan
@@ -367,20 +369,48 @@ with col2:
     check_model_2=st.checkbox("Build Monthly Model",key="bulanan")
     if check_model_2:
         buat_model_bulanan()
+        
 
-def prediksi_harga_saham_nhari(nhari):
-    time_step = 15
+def buat_model_harian(nhari:int):
     df=gabung_data(title).copy()
     scaler=MinMaxScaler(feature_range=(0,1))
     df["norm"]=scaler.fit_transform(df[["Close"]])
-    
+
+    # ambil kolom norm
+    data_norm=df[["norm"]].values.reshape(-1,1)
+
+    # ubah ke tensor untuk lstm
+    time_step = 15
+    X_train, y_train = create_dataset(data_norm, time_step)
+
+    # Buat model LSTM
+    model_harian = Sequential()
+    model_harian.add(LSTM(32, return_sequences=True, input_shape=(time_step, 1)))
+    model_harian.add(LSTM(32, return_sequences=True))
+    model_harian.add(LSTM(32))
+    model_harian.add(Dense(1))
+    model_harian.compile(loss='mean_squared_error', optimizer='adam')
+
+
+    # Jumlah epoch untuk training
+    max_epochs = 5
+
+
+    # Train model_harian dengan progress bar callback
+    model_harian.fit(X_train, y_train, epochs=max_epochs, batch_size=5)
+
+    # Lakukan prediksi dan cek metrik performa
+    train_predict = model_harian.predict(X_train)
+    # Transformasi kembali ke bentuk asli
+    train_predict = scaler.inverse_transform(train_predict)
+    original_ytrain = scaler.inverse_transform(y_train.reshape(-1, 1))
+    score = r2_score(original_ytrain, train_predict)
+
     x_input=df[["norm"]][len(df)-time_step:].values.reshape(1,-1)
     temp_input=list(x_input)
     temp_input=temp_input[0].tolist()
-    
     #prediksi sebanyak data baru
     from numpy import array
-
     lst_output=[]
     n_steps=time_step
     i=0
@@ -392,9 +422,8 @@ def prediksi_harga_saham_nhari(nhari):
             x_input=np.array(temp_input[1:])
             #print("{} day input {}".format(i,x_input))
             x_input = x_input.reshape(1,-1)
-            x_input = x_input.reshape((1, n_steps, 1))
-            
-            yhat = model_harian.predict(x_input, verbose=0)
+
+            yhat = model_harian.predict(x_input)
             #print("{} day output {}".format(i,yhat))
             temp_input.extend(yhat[0].tolist())
             temp_input=temp_input[1:]
@@ -405,7 +434,7 @@ def prediksi_harga_saham_nhari(nhari):
             
         else:
             
-            x_input = x_input.reshape((1, n_steps,1))
+            x_input = x_input.reshape((1, n_steps))
             yhat = model_harian.predict(x_input, verbose=0)
             temp_input.extend(yhat[0].tolist())
             
@@ -414,35 +443,71 @@ def prediksi_harga_saham_nhari(nhari):
             
     # Konversi prediksi menjadi format yang sesuai dan menambahkannya ke DataFrame
     lst_output = scaler.inverse_transform(np.array(lst_output).reshape(-1,1)).reshape(1,-1).tolist()[0]
-    
+
     #masukan hasil ke csv
-    now = datetime.now()
-    one_day_before = now
-    one_day_until=  now + timedelta(days=nhari-1)
-    date_rng=pd.date_range(start=one_day_before, end=one_day_until, freq='B')
-
-    data_baru=pd.DataFrame(date_rng, columns=['tanggal'])
-    data_baru["tanggal"]=pd.to_datetime(data_baru["tanggal"])
+     #buat tanggal dari one days hingga nhari
+    one_day_start = datetime.now()
+    date_rng=pd.date_range(start=one_day_start, end=one_day_start + timedelta(days=nhari), freq='B')
+    if len(date_rng)!=nhari:
+        date_rng=pd.date_range(start=one_day_start, end=one_day_start + timedelta(days=nhari+1), freq='B')
+        if len(date_rng)!=nhari:
+            date_rng=pd.date_range(start=one_day_start, end=one_day_start + timedelta(days=nhari-1), freq='B')
+            if len(date_rng)!=nhari:
+                date_rng=pd.date_range(start=one_day_start, end=one_day_start + timedelta(days=nhari+2), freq='B')
+                
+    date_rng = [date.strftime('%Y-%m-%d') for date in date_rng]
+    data_baru=pd.DataFrame()
+    data_baru["tanggal"]=date_rng
     data_baru['prediksi']=lst_output
-    
+    data_baru["accuracy"]=[score**(i+1) for i in range(data_baru.shape[0])]
 
-    return data_baru
+    return data_baru, score
 
-def prediksi_harga_saham_nbulan(nbulan):
+
+def buat_model_bulanan(nbulan:int):
     data_model_bulanan=gabung_data(title).copy()
     data_model_bulanan["Close"]=data_model_bulanan["Close"].astype(float)
     data_model_bulanan["Date"]=data_model_bulanan["Date"].astype(str)
     data_model_bulanan["Date"]=[i[:7] for i in data_model_bulanan["Date"]]
+    df=data_model_bulanan.copy()
     data_model_bulanan=data_model_bulanan.groupby("Date")["Close"].mean().reset_index()
-    
+
     scaler=MinMaxScaler(feature_range=(0,1))
     data_model_bulanan["norm"]=scaler.fit_transform(data_model_bulanan[["Close"]])
+
+    # ambil kolom norm
+    data_norm=data_model_bulanan[["norm"]].values.reshape(-1,1)
+
+    # ubah ke tensor untuk lstm
     time_step = 7
-    
+    X_train, y_train = create_dataset(data_norm, time_step)
+
+    #reshape input to be [samples, time steps, features] which is required for LSTM
+    model_bulanan=Sequential()
+    model_bulanan.add(LSTM(32,return_sequences=True,input_shape=(time_step,1)))
+    model_bulanan.add(LSTM(32,return_sequences=True))
+    model_bulanan.add(LSTM(32))
+    model_bulanan.add(Dense(1))
+    model_bulanan.compile(loss='mean_squared_error',optimizer='adam')
+
+
+    # Jumlah epoch untuk training
+    max_epochs = 20
+
+
+    model_bulanan.fit(X_train,y_train,epochs=max_epochs,batch_size=5)
+
+    ### Lets Do the prediction and check performance metrics
+    train_predict=model_bulanan.predict(X_train)
+    # Transform back to original form
+    train_predict = scaler.inverse_transform(train_predict)
+    original_ytrain = scaler.inverse_transform(y_train.reshape(-1,1)) 
+    score=r2_score(original_ytrain, train_predict)
+
     x_input=data_model_bulanan[["norm"]][len(data_model_bulanan)-time_step:].values.reshape(1,-1)
     temp_input=list(x_input)
     temp_input=temp_input[0].tolist()
-    
+
     #prediksi sebanyak data baru
     from numpy import array
 
@@ -451,98 +516,115 @@ def prediksi_harga_saham_nbulan(nbulan):
     i=0
     pred_days = nbulan
     while(i<pred_days):
-        
         if(len(temp_input)>time_step):
             
             x_input=np.array(temp_input[1:])
             #print("{} day input {}".format(i,x_input))
             x_input = x_input.reshape(1,-1)
-            x_input = x_input.reshape((1, n_steps, 1))
-            
-            yhat = model_bulanan.predict(x_input, verbose=0)
+
+            yhat = model_bulanan.predict(x_input)
             #print("{} day output {}".format(i,yhat))
             temp_input.extend(yhat[0].tolist())
             temp_input=temp_input[1:]
             #print(temp_input)
-        
+
             lst_output.extend(yhat.tolist())
             i=i+1
-            
         else:
-            
-            x_input = x_input.reshape((1, n_steps,1))
-            yhat = model_bulanan.predict(x_input, verbose=0)
+            x_input = x_input.reshape((1, n_steps))
+            yhat = model_bulanan.predict(x_input)
             temp_input.extend(yhat[0].tolist())
             
             lst_output.extend(yhat.tolist())
             i=i+1
-            
-        # Konversi prediksi menjadi format yang sesuai dan menambahkannya ke DataFrame
-        lst_output = scaler.inverse_transform(np.array(lst_output).reshape(-1,1)).reshape(1,-1).tolist()[0]
         
-        #masukan hasil ke csv
-        now=datetime.now()
-        one_day_before=now-timedelta(days=1)
-        one_day_until=  now + timedelta(days=days_ahead-1)
+       
+            
+    # Konversi prediksi menjadi format yang sesuai dan menambahkannya ke DataFrame
+    lst_output = scaler.inverse_transform(np.array(lst_output).reshape(-1,1)).reshape(-1).tolist()
+    #masukan hasil ke csv
+
+    now = datetime.now()
+    one_day_before = now
+    one_day_until=  now + timedelta(days=30*nbulan-1)
+    date_rng=pd.date_range(start=one_day_before, end=one_day_until, freq='B')
+    
+
+    data_baru=pd.DataFrame(date_rng, columns=['tanggal'])
+    data_baru["tanggal"]=pd.to_datetime(data_baru["tanggal"])
+    data_baru["prediksi"]=np.nan
+    data_baru["tanggal"]=data_baru["tanggal"].astype(str)
+    data_baru["tanggal"]=[i[:7] for i in data_baru["tanggal"]]
+    data_baru=data_baru.groupby("tanggal")["prediksi"].mean().reset_index()
+    #fillna dengan lst_output
+    if len(lst_output)==len(data_baru):
+        data_baru["prediksi"]=lst_output
+    elif len(lst_output)<len(data_baru):
+            data_baru=data_baru.iloc[0:-1,:]
+            data_baru['prediksi']=lst_output
+    else:
+        now = datetime.now()
+        one_day_before = now
+        one_day_until=  now + timedelta(days=30*nbulan)
         date_rng=pd.date_range(start=one_day_before, end=one_day_until, freq='B')
         data_baru=pd.DataFrame(date_rng, columns=['tanggal'])
         data_baru["tanggal"]=pd.to_datetime(data_baru["tanggal"])
-        data_baru["prediksi"]=data_baru["prediksi"].astype(float)
+        data_baru["prediksi"]=np.nan
         data_baru["tanggal"]=data_baru["tanggal"].astype(str)
         data_baru["tanggal"]=[i[:7] for i in data_baru["tanggal"]]
-        data_baru=data_baru.groupby("Date")["prediksi"].mean().reset_index()
-        data_baru['prediksi']=lst_output
-    return data_baru
+        data_baru=data_baru.groupby("tanggal")["prediksi"].mean().reset_index()
+        data_baru['prediksi']=lst_output  
+    data_baru["accuracy"]=[score**(i+1) for i in range(data_baru.shape[0])]
+    return data_baru,score
 
-# col1,col2=st.columns(2)
-# with col1:
-#     st.write("Daily model is a model that is built based on daily stock price data. This model is suitable for short-term investment analysis.")
-#     d = st.date_input("What date would you want to predict until", )
-    
-#     now = datetime.now()
-#     one_day_before = now - timedelta(days=1)
-#     days_ahead=(d-one_day_before.date()).days
-    
-#     st.write(f'Your predicting days {days_ahead} ahead:')
-#     data_baru=prediksi_harga_saham_nhari(days_ahead)
-#     # buat plotly untuk data baru
-#     names = cycle(['Original harga price','Predicted harga price'])
-#     plotdf = pd.DataFrame({'Date': data_baru['tanggal'],                   
-#                         'original_close': data_baru['harga'],
-#                         'predicted_close': data_baru['prediksi']})
 
-#     fig = px.line(plotdf,x=plotdf['Date'], y=[plotdf['original_close'],plotdf['predicted_close']],
-#                     labels={'value':'Stock price','date': 'Date'})
-#     fig.update_layout(title_text='Comparision between original harga price vs predicted harga price',
-#                     plot_bgcolor='white', font_size=15, font_color='black', legend_title_text='Close Price')
-#     fig.for_each_trace(lambda t:  t.update(name = next(names)))
+col1,col2=st.columns(2)
+with col1:
+    if check_model:
+        st.write("Daily model is a model that is built based on daily stock price data. This model is suitable for short-term investment analysis.")
+        nhari = st.text_input("What days would you want to predict until", key="hari")
+        if nhari:
+            nhari=int(nhari)
+            st.write(f'Your predicting days {nhari} ahead:')
+            data_baru,score=buat_model_harian(nhari)
+            st.write(data_baru)
+            st.write("r2 score: ",score)
+            # buat plotly untuk data baru
+            names = cycle(['Original harga price','Predicted harga price'])
+            plotdf = pd.DataFrame({'Date': data_baru['tanggal'],                   
+                                'predicted_close': data_baru['prediksi']})
 
-#     fig.update_xaxes(showgrid=False)
-#     fig.update_yaxes(showgrid=False)
-#     fig.show()
+            fig = px.line(plotdf,x=plotdf['Date'], y=plotdf['predicted_close'],
+                            labels={'value':'Stock price','date': 'Date'})
+            fig.update_layout(title_text=f'prediction of stock price in {nhari} days ahead',
+                            plot_bgcolor='white', font_size=15, font_color='black', legend_title_text='Close Price')
+            fig.for_each_trace(lambda t:  t.update(name = next(names)))
+
+            fig.update_xaxes(showgrid=False)
+            fig.update_yaxes(showgrid=False)
+            st.plotly_chart(fig)
             
-# with col2:
-#     st.write("Monthly model is a model that is built based on monthly stock price data. This model is suitable for long-term investment analysis.")
-#     d=st.date_input("What date would you want to predict until", )
-#     now=datetime.now()
-#     one_day_before=now-timedelta(days=1)
-#     months_ahead=(d-one_day_before.date()).days//30
-#     days_ahead=(d-one_day_before.date()).days
-#     st.write(f'Your predicting months {months_ahead} ahead:')
-#     data_baru=prediksi_harga_saham_nbulan(months_ahead)
-    
-#     # buat plotly untuk data baru
-#     names = cycle(['Original harga price','Predicted harga price'])
-#     plotdf = pd.DataFrame({'Date': data_baru['tanggal'],                   
-#                         'original_close': data_baru['harga'],
-#                         'predicted_close': data_baru['prediksi']})
+with col2:
+    if check_model:
+        st.write("Monthly model is a model that is built based on daily stock price data. This model is suitable for long-term investment analysis.")
+        nbulan = st.text_input("What months would you want to predict until", key="bulan")
+        if nbulan:
+            nbulan=int(nbulan)
+            st.write(f'Your predicting months {nbulan} ahead:')
+            data_baru,score=buat_model_bulanan(nbulan)
+            st.write(data_baru)
+            st.write("r2 score: ",score)
+            # buat plotly untuk data baru
+            names = cycle(['Original harga price','Predicted harga price'])
+            plotdf = pd.DataFrame({'Date': data_baru['tanggal'],                   
+                                'predicted_close': data_baru['prediksi']})
 
-#     fig = px.line(plotdf,x=plotdf['Date'], y=[plotdf['original_close'],plotdf['predicted_close']],
-#                     labels={'value':'Stock price','date': 'Date'})
-#     fig.update_layout(title_text='Comparision between original harga price vs predicted harga price',
-#                     plot_bgcolor='white', font_size=15, font_color='black', legend_title_text='Close Price')
-#     fig.for_each_trace(lambda t:  t.update(name = next(names)))
+            fig = px.line(plotdf,x=plotdf['Date'], y=plotdf['predicted_close'],
+                            labels={'value':'Stock price','date': 'Date'})
+            fig.update_layout(title_text=f'prediction of stock price in {nbulan} months ahead',
+                            plot_bgcolor='white', font_size=15, font_color='black', legend_title_text='Close Price')
+            fig.for_each_trace(lambda t:  t.update(name = next(names)))
 
-#     fig.update_xaxes(showgrid=False)
-#     fig.update_yaxes(showgrid=False)
-#     fig.show()
+            fig.update_xaxes(showgrid=False)
+            fig.update_yaxes(showgrid=False)
+            st.plotly_chart(fig)
