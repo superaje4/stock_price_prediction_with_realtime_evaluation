@@ -21,6 +21,9 @@ from keras.layers import Dense, LSTM
 from sklearn.metrics import r2_score
 from keras.callbacks import Callback
 from itertools import cycle
+import plotly.express as px
+import plotly.graph_objects as go
+
 
 hide_pages(["Default Forcast"])
 hide_pages(["Tunned Forcast"])
@@ -63,12 +66,13 @@ def preprocess_data(df):
 
 @st.cache_data
 def scrap_tambahan():
+    stock_code=pd.read_csv("C:/Users/ASUS/Desktop/Daming/VSC/stock_price_prediction_with_realtime_evaluation/data/processed/clean_database.csv")["StockCode"].unique()
     #buat fungsi iteratif
     start_date = '2024-03-02'
     now = datetime.now()
     one_day_before = now - timedelta(days=1)
     end_date = one_day_before.strftime("%Y-%m-%d")
-    dates = pd.date_range(start=start_date, end=end_date)
+    dates = pd.date_range(start=start_date, end=end_date, freq='D')
 
     #hilangkan jam detik dan milidetik
     formatted_dates = [str(date).replace("-","") for date in dates]
@@ -82,10 +86,13 @@ def scrap_tambahan():
     try:
         tmp = pd.DataFrame(columns=["Date", "StockCode", "Close"])
         
-        
         options = Options()
         options.add_argument('--headless')  # Run Chrome in headless mode (without a visible browser window)
         options.add_argument('--disable-gpu')  # Disable GPU acceleration (can help with stability)
+        # Menetapkan ukuran jendela
+        options.add_argument('window-size=1920x1080')
+        # Mengganti user-agent untuk menghindari deteksi sebagai bot
+        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3')
         undetect = selenium.webdriver.Chrome(options=options)
         
         for i in formatted_dates:
@@ -97,9 +104,9 @@ def scrap_tambahan():
             page_source = undetect.page_source
             if 'recordsTotal":0' in page_source:
                 # Assuming change_date_format is a function you've defined elsewhere
-                df = pd.DataFrame({"Date": [change_date_format(i) for _ in range(len(tmp["StockCode"].unique()))],
-                                "StockCode": list(tmp["StockCode"].unique()),
-                                "Close": ["unk" for _ in tmp["StockCode"].unique()]})
+                df = pd.DataFrame({"Date": [change_date_format(i) for _ in range(len(stock_code))],
+                                "StockCode": list(stock_code),
+                                "Close": ["unk" for _ in stock_code]})
                 tmp = pd.concat([tmp, df], ignore_index=True)
             else:
                 data = json.loads(undetect.find_element(By.TAG_NAME, 'pre').text)
@@ -107,8 +114,6 @@ def scrap_tambahan():
                 # Ensure the column names here match those in the JSON structure
                 df = df[["Date", "StockCode", "Close"]]
                 tmp = pd.concat([tmp, df], ignore_index=True)
-    except:
-        print("An error occurred")
 
     finally:
         time.sleep(2)
@@ -124,7 +129,8 @@ def gabung_data(nama_perusahaan):
     
     #spesifikasi namaperusahaan
     df_perusahaan=df[df["StockCode"]==nama_perusahaan]
-    
+    df_perusahaan["Date"]=df_perusahaan["Date"].astype(str)
+    df_perusahaan=preprocess_data(df_perusahaan)
     return df_perusahaan
     
 

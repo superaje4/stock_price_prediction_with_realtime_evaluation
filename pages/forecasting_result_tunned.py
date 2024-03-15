@@ -15,7 +15,13 @@ import numpy as np
 import json
 import plotly.express as px
 from plotly.subplots import make_subplots
-
+from sklearn.preprocessing import MinMaxScaler
+from keras.models import Sequential
+from keras.layers import Dense, LSTM
+from sklearn.metrics import r2_score
+from keras.callbacks import Callback
+from itertools import cycle
+import plotly.graph_objects as go
 
 hide_pages(["Default Forcast"])
 hide_pages(["Tunned Forcast"])
@@ -56,19 +62,20 @@ def preprocess_data(df):
     df = df.groupby('StockCode').apply(fill_group).reset_index(drop=True)
     return df
 
+
 @st.cache_data
 def scrap_tambahan():
+    stock_code=pd.read_csv("C:/Users/ASUS/Desktop/Daming/VSC/stock_price_prediction_with_realtime_evaluation/data/processed/clean_database.csv")["StockCode"].unique()
     #buat fungsi iteratif
     start_date = '2024-03-02'
     now = datetime.now()
     one_day_before = now - timedelta(days=1)
     end_date = one_day_before.strftime("%Y-%m-%d")
-    dates = pd.date_range(start=start_date, end=end_date)
+    dates = pd.date_range(start=start_date, end=end_date, freq='D')
 
     #hilangkan jam detik dan milidetik
     formatted_dates = [str(date).replace("-","") for date in dates]
     formatted_dates = [date[:8] for date in formatted_dates]
-
 
     #ubah formated dates ke format 2020-03-02
     def change_date_format(date):
@@ -78,10 +85,13 @@ def scrap_tambahan():
     try:
         tmp = pd.DataFrame(columns=["Date", "StockCode", "Close"])
         
-        
         options = Options()
         options.add_argument('--headless')  # Run Chrome in headless mode (without a visible browser window)
         options.add_argument('--disable-gpu')  # Disable GPU acceleration (can help with stability)
+        # Menetapkan ukuran jendela
+        options.add_argument('window-size=1920x1080')
+        # Mengganti user-agent untuk menghindari deteksi sebagai bot
+        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3')
         undetect = selenium.webdriver.Chrome(options=options)
         
         for i in formatted_dates:
@@ -93,9 +103,9 @@ def scrap_tambahan():
             page_source = undetect.page_source
             if 'recordsTotal":0' in page_source:
                 # Assuming change_date_format is a function you've defined elsewhere
-                df = pd.DataFrame({"Date": [change_date_format(i) for _ in range(len(tmp["StockCode"].unique()))],
-                                "StockCode": list(tmp["StockCode"].unique()),
-                                "Close": ["unk" for _ in tmp["StockCode"].unique()]})
+                df = pd.DataFrame({"Date": [change_date_format(i) for _ in range(len(stock_code))],
+                                "StockCode": list(stock_code),
+                                "Close": ["unk" for _ in stock_code]})
                 tmp = pd.concat([tmp, df], ignore_index=True)
             else:
                 data = json.loads(undetect.find_element(By.TAG_NAME, 'pre').text)
@@ -103,26 +113,30 @@ def scrap_tambahan():
                 # Ensure the column names here match those in the JSON structure
                 df = df[["Date", "StockCode", "Close"]]
                 tmp = pd.concat([tmp, df], ignore_index=True)
-    except:
-        print("An error occurred")
 
     finally:
         time.sleep(2)
         undetect.quit()
         tmp=preprocess_data(tmp)
         return tmp
-    
+
+
 @st.cache_data
 def gabung_data(nama_perusahaan):
-    df=pd.read_csv("data/processed/clean_database.csv")
+    df=pd.read_csv("C:/Users/ASUS/Desktop/Daming/VSC/stock_price_prediction_with_realtime_evaluation/data/processed/clean_database.csv")
     df1=scrap_tambahan()
     df=pd.concat([df,df1],ignore_index=True)
     
     #spesifikasi namaperusahaan
     df_perusahaan=df[df["StockCode"]==nama_perusahaan]
-    
+    df_perusahaan["Date"]=df_perusahaan["Date"].astype(str)
+    df_perusahaan=preprocess_data(df_perusahaan)
     return df_perusahaan
-    
+
+def ambil_data_train(title):
+    df=pd.read_csv("C:/Users/ASUS/Desktop/Daming/VSC/stock_price_prediction_with_realtime_evaluation/data/processed/clean_database.csv")
+    df=df.loc[df["StockCode"]==title]
+    return df
 
 def convert_df(df):
     # IMPORTANT: Cache the conversion to prevent computation on every rerun
@@ -136,27 +150,28 @@ def download_link(data_perusahaan):
         file_name='large_df.csv',
         mime='text/csv',
     )
-    
+
 # Inisialisasi session state untuk 'data_perusahaan'
 st.session_state['data_perusahaan'] = None
-
 st.title('Unlock Insights: Advanced Forecasting Models at Your Fingertips')
+
 
 col1,col2=st.columns(2)
 with col1:
-    title = st.text_input('Write the IDX of the company')
-    scrape_button = st.button('Scrape data')
-    if scrape_button:
+    input=st.text_input('Write the IDX of the company')
+    title=str(input)
+    button_scrap = st.button('Scrap Data')
+    if button_scrap:
+        title=str(input)
         st.session_state['data_perusahaan'] = gabung_data(title)
-
+     
 with col2:
-     if 'data_perusahaan' in st.session_state and st.session_state['data_perusahaan'] is not None:
+    if 'data_perusahaan' in st.session_state and st.session_state['data_perusahaan'] is not None:
         # Asumsi 'download_link' adalah fungsi yang Anda definisikan untuk mengunduh data
         download_link(st.session_state['data_perusahaan'])
         st.write(st.session_state['data_perusahaan'])
-    
-# Plot data
-if 'data_perusahaan' in st.session_state and st.session_state['data_perusahaan'] is not None:
+   
+if title:
     plotdf = gabung_data(title)
     fig = px.line(plotdf, x='Date', y='Close', labels={'x': 'Date', 'y': 'Close Price'}, title=f"Stock Price {title}")
     fig.update_xaxes(showgrid=False)
@@ -165,3 +180,410 @@ if 'data_perusahaan' in st.session_state and st.session_state['data_perusahaan']
     # Tampilkan plot di Streamlit
     st.plotly_chart(fig)
 
+    
+# convert an array of values into a dataset matrix
+if "model_harian" not in st.session_state:
+    st.session_state["model_harian"]=None
+
+@st.cache_data
+def create_dataset(dataset, time_step=1):
+    dataX, dataY = [], []
+    for i in range(len(dataset)-time_step-1):
+        a = dataset[i:(i+time_step), 0]   ###i=0, 0,1,2,3-----99   100 
+        dataX.append(a)
+        dataY.append(dataset[i + time_step, 0])
+    return np.array(dataX), np.array(dataY)
+
+# Callback untuk update progress bar di Streamlit
+class StreamlitProgressCallback(Callback):
+    def __init__(self, max_epochs):
+        self.max_epochs = max_epochs
+        self.progress_bar = st.progress(0)
+
+    def on_epoch_end(self, epoch, logs=None):
+        # Update progress bar
+        progress = (epoch + 1) / self.max_epochs
+        self.progress_bar.progress(progress)
+        
+@st.cache_resource
+def buat_model_harian():
+    # normalisasi data
+    df=ambil_data_train(title)
+    data_model_harian=df.copy()
+    data_model_harian=data_model_harian.loc[data_model_harian["StockCode"]==title]
+    scaler=MinMaxScaler(feature_range=(0,1))
+    data_model_harian["norm"]=scaler.fit_transform(data_model_harian[["Close"]])
+
+    # ambil kolom norm
+    data_norm=data_model_harian[["norm"]].values.reshape(-1,1)
+
+    # ubah ke tensor untuk lstm
+    time_step = 15
+    X_train, y_train = create_dataset(data_norm, time_step)
+    
+    # Buat model LSTM
+    model_harian = Sequential()
+    model_harian.add(LSTM(32, return_sequences=True, input_shape=(time_step, 1)))
+    model_harian.add(LSTM(32, return_sequences=True))
+    model_harian.add(LSTM(32))
+    model_harian.add(Dense(1))
+    model_harian.compile(loss='mean_squared_error', optimizer='adam')
+
+    
+    # Jumlah epoch untuk training
+    max_epochs = 5
+
+    # Buat instance callback Streamlit
+    progress_callback = StreamlitProgressCallback(max_epochs)
+
+    # Train model_harian dengan progress bar callback
+    history = model_harian.fit(X_train, y_train, epochs=max_epochs, batch_size=5, verbose=1, callbacks=[progress_callback])
+
+    # Lakukan prediksi dan cek metrik performa
+    train_predict = model_harian.predict(X_train)
+    # Transformasi kembali ke bentuk asli
+    train_predict = scaler.inverse_transform(train_predict)
+    original_ytrain = scaler.inverse_transform(y_train.reshape(-1, 1))
+    score = r2_score(original_ytrain, train_predict)
+    
+    st.write("r2 score: ",score)
+            
+    time_step = 15
+    look_back = time_step
+    trainPredictPlot = np.empty_like(data_model_harian['Close'])
+    trainPredictPlot[:] = np.nan
+    trainPredictPlot[look_back:len(train_predict)+look_back] = train_predict.flatten()
+
+    # Setup the cycle for legend names
+    names = cycle(['Original close price', 'Train predicted close price'])
+
+    plotdf = pd.DataFrame({
+        'date': data_model_harian['Date'],
+        'original_close': data_model_harian['Close'],
+        'train_predicted_close': trainPredictPlot,
+    })
+
+    # Create a line plot with Plotly Express
+    fig = px.line(plotdf, x='date', y=['original_close', 'train_predicted_close'],
+                labels={'value': 'Stock price', 'date': 'Date'})
+    
+    # Update the layout of the plot
+    fig.update_layout(
+        title_text='Comparison between original Close price vs predicted Close price',
+        plot_bgcolor='white',
+        font_size=15,
+        font_color='black',
+        legend_title_text='Price'
+    )
+    
+    # Update names of the traces
+    fig.for_each_trace(lambda t: t.update(name=next(names)))
+    
+    # Remove the gridlines from the plot
+    fig.update_xaxes(showgrid=False)
+    fig.update_yaxes(showgrid=False)
+
+    # Display the plot in Streamlit
+    st.plotly_chart(fig)
+    
+    st.session_state["model_harian"]=model_harian
+
+#untuk bulanan
+if "model_bulanan" not in st.session_state:
+    st.session_state["model_bulanan"]=None
+
+if "data_real_bulanan" not in st.session_state:
+    st.session_state["data_real_bulanan"]=None
+if "data_model_bulanan" not in st.session_state:
+    st.session_state["data_model_bulanan"]=None
+    
+@st.cache_resource
+def buat_model_bulanan():
+    # normalisasi data
+    data_real_bulanan=gabung_data(title).copy()
+    data_real_bulanan=data_real_bulanan.loc[data_real_bulanan["StockCode"]==title]
+    data_real_bulanan["Close"]=data_real_bulanan["Close"].astype(float)
+    data_real_bulanan["Date"]=data_real_bulanan["Date"].astype(str)
+    data_real_bulanan["Date"]=[i[:7] for i in data_real_bulanan["Date"]]
+    data_real_bulanan=data_real_bulanan.groupby("Date")["Close"].mean().reset_index()
+    
+    df=ambil_data_train(title)
+    data_model_bulanan=df.copy()
+    data_model_bulanan=data_model_bulanan.loc[data_model_bulanan["StockCode"]==title]
+    data_model_bulanan["Close"]=data_model_bulanan["Close"].astype(float)
+    data_model_bulanan["Date"]=data_model_bulanan["Date"].astype(str)
+    data_model_bulanan["Date"]=[i[:7] for i in data_model_bulanan["Date"]]
+    data_model_bulanan=data_model_bulanan.groupby("Date")["Close"].mean().reset_index()
+    data_model_bulanan=data_model_bulanan[:49]
+        
+    scaler=MinMaxScaler(feature_range=(0,1))
+    data_model_bulanan["norm"]=scaler.fit_transform(data_model_bulanan[["Close"]])
+
+    # ambil kolom norm
+    data_norm=data_model_bulanan[["norm"]].values.reshape(-1,1)
+
+    # ubah ke tensor untuk lstm
+    time_step = 7
+    X_train, y_train = create_dataset(data_norm, time_step)
+
+    #reshape input to be [samples, time steps, features] which is required for LSTM
+    model_bulanan=Sequential()
+    model_bulanan.add(LSTM(32,return_sequences=True,input_shape=(time_step,1)))
+    model_bulanan.add(LSTM(32,return_sequences=True))
+    model_bulanan.add(LSTM(32))
+    model_bulanan.add(Dense(1))
+    model_bulanan.compile(loss='mean_squared_error',optimizer='adam')
+    
+    
+    # Jumlah epoch untuk training
+    max_epochs = 20
+
+    # Buat instance callback Streamlit
+    progress_callback = StreamlitProgressCallback(max_epochs)
+    
+    model_bulanan.fit(X_train,y_train,epochs=max_epochs,batch_size=5, verbose=1, callbacks=[progress_callback])
+    
+    ### Lets Do the prediction and check performance metrics
+    train_predict=model_bulanan.predict(X_train)
+    # Transform back to original form
+    train_predict = scaler.inverse_transform(train_predict)
+    original_ytrain = scaler.inverse_transform(y_train.reshape(-1,1)) 
+    score=r2_score(original_ytrain, train_predict)
+    st.write("r2 score: ",score)
+     
+    time_step = 7
+    look_back = time_step
+    trainPredictPlot =  np.empty_like(data_model_bulanan['Close'])
+    trainPredictPlot[:] = np.nan
+    trainPredictPlot[look_back:len(train_predict)+look_back] = train_predict.flatten()
+
+
+    # Setup the cycle for legend names
+    names = cycle(['Original close price', 'Train predicted close price'])
+
+    plotdf = pd.DataFrame({
+        'date': data_model_bulanan['Date'],
+        'original_close': data_model_bulanan['Close'],
+        'train_predicted_close': trainPredictPlot,
+    })
+
+    # Create a line plot with Plotly Express
+    fig = px.line(plotdf, x='date', y=['original_close', 'train_predicted_close'],
+                labels={'value': 'Stock price', 'date': 'Date'})
+    
+    # Update the layout of the plot
+    fig.update_layout(
+        title_text='Comparison between original Close price vs predicted Close price',
+        plot_bgcolor='white',
+        font_size=15,
+        font_color='black',
+        legend_title_text='Price'
+    )
+    
+    # Update names of the traces
+    fig.for_each_trace(lambda t: t.update(name=next(names)))
+    
+    # Remove the gridlines from the plot
+    fig.update_xaxes(showgrid=False)
+    fig.update_yaxes(showgrid=False)
+
+    # Display the plot in Streamlit
+    st.plotly_chart(fig)
+    
+    st.session_state["data_real_bulanan"]=data_real_bulanan
+    st.session_state["data_model_bulanan"]=data_model_bulanan
+    st.session_state["model_bulanan"]=model_bulanan
+        
+col1,col2=st.columns(2)
+with col1:
+    check_model=st.checkbox("Build Daily Model",key="harian")
+    if check_model:
+        buat_model_harian()
+            
+
+with col2:
+    check_model_2=st.checkbox("Build Monthly Model",key="bulanan")
+    if check_model_2:
+        buat_model_bulanan()
+
+
+if check_model:
+    st.write("Daily model is a model that is built based on daily stock price data. This model is suitable for short-term investment analysis.")
+    nhari = st.text_input("What days would you want to predict until", key="hari",value=len(gabung_data(title))-len(ambil_data_train(title)))
+    nhari=int(nhari)
+    if nhari:
+        data_real=gabung_data(title).copy()
+        df=ambil_data_train(title)
+        data_model_harian=df.copy()
+        data_model_harian=data_model_harian.loc[data_model_harian["StockCode"]==title]
+        scaler=MinMaxScaler(feature_range=(0,1))
+        data_model_harian["norm"]=scaler.fit_transform(data_model_harian[["Close"]])
+        # ambil kolom norm
+        data_norm=data_model_harian[["norm"]].values.reshape(-1,1)
+        # ubah ke tensor untuk lstms
+        time_step = 15
+        X_train, y_train = create_dataset(data_norm, time_step)
+        x_input=X_train[-1]
+        temp_input=list(X_train[[-1]])
+        temp_input=temp_input[0].tolist()
+        #prediksi sebanyak data baru
+        from numpy import array
+        lst_output=[]
+        n_steps=time_step
+        i=0
+        pred_days = nhari
+        while(i<pred_days):
+            
+            if(len(temp_input)>time_step):
+                
+                x_input=np.array(temp_input[1:])
+                #print("{} day input {}".format(i,x_input))
+                x_input = x_input.reshape(1,-1)
+
+                yhat = st.session_state["model_harian"].predict(x_input)
+                #print("{} day output {}".format(i,yhat))
+                temp_input.extend(yhat[0].tolist())
+                temp_input=temp_input[1:]
+                #print(temp_input)
+            
+                lst_output.extend(yhat.tolist())
+                i=i+1
+                
+            else:
+                
+                x_input = x_input.reshape((1, n_steps))
+                yhat = st.session_state["model_harian"].predict(x_input, verbose=0)
+                temp_input.extend(yhat[0].tolist())
+                
+                lst_output.extend(yhat.tolist())
+                i=i+1
+        lst_output = scaler.inverse_transform(np.array(lst_output).reshape(-1,1)).reshape(1,-1).tolist()[0]
+        result=pd.DataFrame()
+        #atur date
+        date_terakhir=data_model_harian.iloc[-1,:]["Date"]
+        date_terakhir=datetime.strptime(date_terakhir, '%Y-%m-%d')
+        date_terakhir=date_terakhir.date()+timedelta(days=1)
+        date_ujung=date_terakhir+timedelta(days=nhari-1)
+                
+        date_rng=pd.date_range(start=date_terakhir , end=date_ujung)
+        date_rng = [date.strftime('%Y-%m-%d') for date in date_rng]
+        
+        #masukan hasil ke csv
+        result["Date"]=pd.to_datetime(date_rng)
+        result['Predicted']=lst_output
+        result=pd.merge(result,data_real,how="left",on="Date")
+        result=result[["Date","Predicted","Close"]]
+
+
+        # Membuat plot dengan Plotly
+        fig = px.line(result, x='Date', y=['Predicted'], labels={'value': 'Price', 'variable': 'Category'})
+
+        # Tambahkan titik data original dengan marker hitam
+        fig.add_trace(go.Scatter(
+            x=result['Date'], y=result['Close'], mode='markers',
+            name='Original', marker=dict(color='black'),
+            hovertemplate='Category : Original<br>Date: %{x}<br>Price: %{y}<extra></extra>'
+        ))
+
+        # Update layout
+        fig.update_layout(
+            title='Original vs Prediction Close Price',
+            plot_bgcolor='white', font_size=15, font_color='black', legend_title_text='Price'
+        )
+
+        # Update tampilan sumbu
+        fig.update_xaxes(showgrid=False, title_text='Date')
+        fig.update_yaxes(showgrid=False, title_text='Price')
+
+        # Tampilkan plot
+        st.plotly_chart(fig)
+
+nbulan=1
+if check_model_2:
+    st.write("Monthly model is a model that is built based on monthly stock price data. This model is suitable for long-term investment analysis.")
+    nbulan = st.text_input("What months would you want to predict until", key="bulan",value=len(st.session_state["data_real_bulanan"])-len(st.session_state["data_model_bulanan"]))
+    nbulan=int(nbulan)
+    if nbulan:
+
+        scaler=MinMaxScaler(feature_range=(0,1))
+        st.session_state["data_model_bulanan"]["norm"]=scaler.fit_transform(st.session_state["data_model_bulanan"][["Close"]])
+
+        # ambil kolom norm
+        data_norm=st.session_state["data_model_bulanan"][["norm"]].values.reshape(-1,1)
+
+        # ubah ke tensor untuk lstm
+        time_step = 7
+        X_train, y_train = create_dataset(data_norm, time_step)
+        x_input=X_train[-1]
+        temp_input=list(X_train[[-1]])
+        temp_input=temp_input[0].tolist()
+        
+        from numpy import array
+        lst_output=[]
+        n_steps=time_step
+        i=0
+        pred_days = nbulan
+        while(i<pred_days):
+            
+            if(len(temp_input)>time_step):
+                
+                x_input=np.array(temp_input[1:])
+                #print("{} day input {}".format(i,x_input))
+                x_input = x_input.reshape(1,-1)
+
+                yhat = st.session_state["model_bulanan"].predict(x_input)
+                #print("{} day output {}".format(i,yhat))
+                temp_input.extend(yhat[0].tolist())
+                temp_input=temp_input[1:]
+                #print(temp_input)
+            
+                lst_output.extend(yhat.tolist())
+                i=i+1
+                
+            else:
+                
+                x_input = x_input.reshape((1, n_steps))
+                yhat = st.session_state["model_bulanan"].predict(x_input, verbose=0)
+                temp_input.extend(yhat[0].tolist())
+                
+                lst_output.extend(yhat.tolist())
+                i=i+1
+        lst_output = scaler.inverse_transform(np.array(lst_output).reshape(-1,1)).reshape(1,-1).tolist()[0]
+        result=pd.DataFrame()
+        #atur date
+        start_date = '2024-02'
+        end_date = pd.to_datetime(start_date) + pd.DateOffset(months=nbulan)
+        date_range = pd.date_range(start=start_date, end=end_date, freq='M')
+        date_range = [date.strftime('%Y-%m') for date in date_range]
+
+        
+        #masukan hasil ke csv
+        result["Date"]=date_range
+        result['Predicted']=lst_output
+        result=pd.merge(result,st.session_state["data_real_bulanan"],how="left",on="Date")
+        result=result[["Date","Predicted","Close"]]
+
+
+        # Membuat plot dengan Plotly
+        fig = px.line(result, x='Date', y=['Predicted'], labels={'value': 'Price', 'variable': 'Category'})
+
+        # Tambahkan titik data original dengan marker hitam
+        fig.add_trace(go.Scatter(
+            x=result['Date'], y=result['Close'], mode='markers',
+            name='Original', marker=dict(color='black'),
+            hovertemplate='Category : Original<br>Date: %{x}<br>Price: %{y}<extra></extra>'
+        ))
+
+        # Update layout
+        fig.update_layout(
+            title='Original vs Prediction Close Price',
+            plot_bgcolor='white', font_size=15, font_color='black', legend_title_text='Price'
+        )
+
+        # Update tampilan sumbu
+        fig.update_xaxes(showgrid=False, title_text='Date')
+        fig.update_yaxes(showgrid=False, title_text='Price')
+
+        # Tampilkan plot
+        st.plotly_chart(fig)
+ 
