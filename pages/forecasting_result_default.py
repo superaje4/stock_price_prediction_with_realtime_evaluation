@@ -120,7 +120,7 @@ def scrap_tambahan():
 
     finally:
         time.sleep(2)
-        st.session_state["undetect"].quit()
+        # st.session_state["undetect"].quit()
         tmp=preprocess_data(tmp)
         return tmp
 
