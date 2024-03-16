@@ -24,11 +24,6 @@ from itertools import cycle
 import plotly.express as px
 import plotly.graph_objects as go
 import sqlite3
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.core.os_manager import ChromeType
 
 #hide pages
 hide_pages(["Default Forcast"])
@@ -70,18 +65,6 @@ def preprocess_data(df):
     df = df.groupby('StockCode').apply(fill_group).reset_index(drop=True)
     return df
 
-@st.cache_resource
-def get_driver():
-    options = Options()
-    options.add_argument("--disable-gpu")
-    options.add_argument("--headless")
-    return webdriver.Chrome(
-        service=Service(
-            ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()
-        ),
-        options=options,
-    )
-
 @st.cache_data
 def scrap_tambahan():
     stock_code=pd.read_csv("data/processed/clean_database.csv")["StockCode"].unique()
@@ -104,15 +87,14 @@ def scrap_tambahan():
     try:
         tmp = pd.DataFrame(columns=["Date", "StockCode", "Close"])
         
-        # options = Options()
-        # options.add_argument('--headless')  # Run Chrome in headless mode (without a visible browser window)
-        # options.add_argument('--disable-gpu')  # Disable GPU acceleration (can help with stability)
-        # # Menetapkan ukuran jendela
-        # options.add_argument('window-size=1920x1080')
-        # # Mengganti user-agent untuk menghindari deteksi sebagai bot
-        # options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3')
-        # undetect = selenium.webdriver.Chrome(options=options)
-        undetect = get_driver()
+        options = Options()
+        options.add_argument('--headless')  # Run Chrome in headless mode (without a visible browser window)
+        options.add_argument('--disable-gpu')  # Disable GPU acceleration (can help with stability)
+        # Menetapkan ukuran jendela
+        options.add_argument('window-size=1920x1080')
+        # Mengganti user-agent untuk menghindari deteksi sebagai bot
+        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3')
+        undetect = selenium.webdriver.Chrome(options=options)
         
         for i in formatted_dates:
             url = f"https://www.idx.co.id/primary/TradingSummary/GetStockSummary?length=9999&start=0&date={i}"
