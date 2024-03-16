@@ -66,7 +66,7 @@ def preprocess_data(df):
     df = df.groupby('StockCode').apply(fill_group).reset_index(drop=True)
     return df
 
-
+@st.cache_data
 def scrap_tambahan():
     stock_code=pd.read_csv("data/processed/clean_database.csv")["StockCode"].unique()
     #buat fungsi iteratif
@@ -124,6 +124,7 @@ def scrap_tambahan():
         return tmp
 
 
+@st.cache_data
 def gabung_data(nama_perusahaan):
     df=pd.read_csv("data/processed/clean_database.csv")
     df1=scrap_tambahan()
