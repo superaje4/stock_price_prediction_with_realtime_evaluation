@@ -68,7 +68,7 @@ def preprocess_data(df):
 
 @st.cache_data
 def scrap_tambahan():
-    stock_code=pd.read_csv("C:/Users/ASUS/Desktop/Daming/VSC/stock_price_prediction_with_realtime_evaluation/data/processed/clean_database.csv")["StockCode"].unique()
+    stock_code=pd.read_csv("data/processed/clean_database.csv")["StockCode"].unique()
     #buat fungsi iteratif
     start_date = '2024-03-02'
     now = datetime.now()
@@ -126,7 +126,7 @@ def scrap_tambahan():
 
 @st.cache_data
 def gabung_data(nama_perusahaan):
-    df=pd.read_csv("C:/Users/ASUS/Desktop/Daming/VSC/stock_price_prediction_with_realtime_evaluation/data/processed/clean_database.csv")
+    df=pd.read_csv("data/processed/clean_database.csv")
     df1=scrap_tambahan()
     df=pd.concat([df,df1],ignore_index=True)
     
@@ -586,7 +586,7 @@ with col1:
             fig.update_yaxes(showgrid=False)
             st.plotly_chart(fig)
             
-            with sqlite3.connect("C:/Users/ASUS/Desktop/Daming/VSC/stock_price_prediction_with_realtime_evaluation/data/database/stock.db") as con:
+            with sqlite3.connect("data/database/stock.db") as con:
                 cursor=con.cursor()
                 data_baru.to_sql("forcasting_result_default_harian", con, if_exists="append", index=False)
                 con.commit()
@@ -615,7 +615,7 @@ with col2:
             fig.update_yaxes(showgrid=False)
             st.plotly_chart(fig)
             
-            with sqlite3.connect("C:/Users/ASUS/Desktop/Daming/VSC/stock_price_prediction_with_realtime_evaluation/data/database/stock.db") as con:
+            with sqlite3.connect("data/database/stock.db") as con:
                 cursor=con.cursor()
                 data_baru.to_sql("forcasting_result_default_bulanan", con, if_exists="append", index=False)
                 con.commit()
