@@ -124,7 +124,6 @@ def scrap_tambahan():
         return tmp
 
 
-@st.cache_data
 def gabung_data(nama_perusahaan):
     df=pd.read_csv("data/processed/clean_database.csv")
     df1=scrap_tambahan()
