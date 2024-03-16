@@ -22,6 +22,7 @@ from sklearn.metrics import r2_score
 from keras.callbacks import Callback
 from itertools import cycle
 import plotly.graph_objects as go
+import sqlite3
 
 hide_pages(["Default Forcast"])
 hide_pages(["Tunned Forcast"])
@@ -497,8 +498,13 @@ if check_model:
 
         # Tampilkan plot
         st.plotly_chart(fig)
+        
+        with sqlite3.connect("C:/Users/ASUS/Desktop/Daming/VSC/stock_price_prediction_with_realtime_evaluation/data/database/stock.db") as con:
+            cursor=con.cursor()
+            result.to_sql("forcasting_result_tunned_harian", con, if_exists="append", index=False)
+            con.commit()
 
-nbulan=1
+
 if check_model_2:
     st.write("Monthly model is a model that is built based on monthly stock price data. This model is suitable for long-term investment analysis.")
     nbulan = st.text_input("What months would you want to predict until", key="bulan",value=len(st.session_state["data_real_bulanan"])-len(st.session_state["data_model_bulanan"]))
@@ -586,4 +592,8 @@ if check_model_2:
 
         # Tampilkan plot
         st.plotly_chart(fig)
- 
+
+        with sqlite3.connect("C:/Users/ASUS/Desktop/Daming/VSC/stock_price_prediction_with_realtime_evaluation/data/database/stock.db") as con:
+            cursor=con.cursor()
+            result.to_sql("forcasting_result_tunned_bulanan", con, if_exists="append", index=False)
+            con.commit()

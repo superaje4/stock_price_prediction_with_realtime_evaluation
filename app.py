@@ -1,11 +1,6 @@
 #buat dashboard untuk tampilan awal web forcasting dengan stream lit
 import streamlit as st
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import datetime
-from pathlib import Path
 from st_pages import Page, add_page_title, show_pages, Section, hide_pages
 
 
@@ -91,8 +86,5 @@ show_pages([
     Page("pages/forecasting_result_tunned.py", "Tunned Forcast")])
 
 
-
 add_page_title()
 
-
-    

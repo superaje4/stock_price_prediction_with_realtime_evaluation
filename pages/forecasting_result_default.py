@@ -23,6 +23,8 @@ from keras.callbacks import Callback
 from itertools import cycle
 import plotly.express as px
 import plotly.graph_objects as go
+import sqlite3
+
 
 
 hide_pages(["Default Forcast"])
@@ -120,7 +122,8 @@ def scrap_tambahan():
         undetect.quit()
         tmp=preprocess_data(tmp)
         return tmp
-    
+
+
 @st.cache_data
 def gabung_data(nama_perusahaan):
     df=pd.read_csv("C:/Users/ASUS/Desktop/Daming/VSC/stock_price_prediction_with_realtime_evaluation/data/processed/clean_database.csv")
@@ -199,10 +202,11 @@ class StreamlitProgressCallback(Callback):
         progress = (epoch + 1) / self.max_epochs
         self.progress_bar.progress(progress)
 
+if "model_harian" not in st.session_state:
+    st.session_state["model_harian"] = None
 @st.cache_resource
 def buat_model_harian():
     # normalisasi data
-    global model_harian
     data_model_harian=gabung_data(title).copy()
     scaler=MinMaxScaler(feature_range=(0,1))
     data_model_harian["norm"]=scaler.fit_transform(data_model_harian[["Close"]])
@@ -278,12 +282,14 @@ def buat_model_harian():
 
     # Display the plot in Streamlit
     st.plotly_chart(fig)
+    st.session_state["model_harian"] = model_harian
 
 #untuk bulanan
+if "model_bulanan" not in st.session_state:
+    st.session_state["model_bulanan"] = None
 @st.cache_resource
 def buat_model_bulanan():
     # normalisasi data
-    global model_bulanan
     data_model_bulanan=gabung_data(title).copy()
     data_model_bulanan["Close"]=data_model_bulanan["Close"].astype(float)
     data_model_bulanan["Date"]=data_model_bulanan["Date"].astype(str)
@@ -363,7 +369,8 @@ def buat_model_bulanan():
 
     # Display the plot in Streamlit
     st.plotly_chart(fig)
-
+    st.session_state["model_bulanan"] = model_bulanan
+    
 col1,col2=st.columns(2)
 with col1:
     check_model=st.checkbox("Build Daily Model",key="harian")
@@ -388,25 +395,9 @@ def buat_model_harian(nhari:int):
     # ubah ke tensor untuk lstm
     time_step = 15
     X_train, y_train = create_dataset(data_norm, time_step)
-
-    # Buat model LSTM
-    model_harian = Sequential()
-    model_harian.add(LSTM(32, return_sequences=True, input_shape=(time_step, 1)))
-    model_harian.add(LSTM(32, return_sequences=True))
-    model_harian.add(LSTM(32))
-    model_harian.add(Dense(1))
-    model_harian.compile(loss='mean_squared_error', optimizer='adam')
-
-
-    # Jumlah epoch untuk training
-    max_epochs = 5
-
-
-    # Train model_harian dengan progress bar callback
-    model_harian.fit(X_train, y_train, epochs=max_epochs, batch_size=5)
-
+    
     # Lakukan prediksi dan cek metrik performa
-    train_predict = model_harian.predict(X_train)
+    train_predict = st.session_state["model_harian"].predict(X_train)
     # Transformasi kembali ke bentuk asli
     train_predict = scaler.inverse_transform(train_predict)
     original_ytrain = scaler.inverse_transform(y_train.reshape(-1, 1))
@@ -429,7 +420,7 @@ def buat_model_harian(nhari:int):
             #print("{} day input {}".format(i,x_input))
             x_input = x_input.reshape(1,-1)
 
-            yhat = model_harian.predict(x_input)
+            yhat = st.session_state["model_harian"].predict(x_input)
             #print("{} day output {}".format(i,yhat))
             temp_input.extend(yhat[0].tolist())
             temp_input=temp_input[1:]
@@ -441,7 +432,7 @@ def buat_model_harian(nhari:int):
         else:
             
             x_input = x_input.reshape((1, n_steps))
-            yhat = model_harian.predict(x_input, verbose=0)
+            yhat = st.session_state["model_harian"].predict(x_input, verbose=0)
             temp_input.extend(yhat[0].tolist())
             
             lst_output.extend(yhat.tolist())
@@ -488,23 +479,8 @@ def buat_model_bulanan(nbulan:int):
     time_step = 7
     X_train, y_train = create_dataset(data_norm, time_step)
 
-    #reshape input to be [samples, time steps, features] which is required for LSTM
-    model_bulanan=Sequential()
-    model_bulanan.add(LSTM(32,return_sequences=True,input_shape=(time_step,1)))
-    model_bulanan.add(LSTM(32,return_sequences=True))
-    model_bulanan.add(LSTM(32))
-    model_bulanan.add(Dense(1))
-    model_bulanan.compile(loss='mean_squared_error',optimizer='adam')
-
-
-    # Jumlah epoch untuk training
-    max_epochs = 20
-
-
-    model_bulanan.fit(X_train,y_train,epochs=max_epochs,batch_size=5)
-
     ### Lets Do the prediction and check performance metrics
-    train_predict=model_bulanan.predict(X_train)
+    train_predict=st.session_state["model_bulanan"].predict(X_train)
     # Transform back to original form
     train_predict = scaler.inverse_transform(train_predict)
     original_ytrain = scaler.inverse_transform(y_train.reshape(-1,1)) 
@@ -528,7 +504,7 @@ def buat_model_bulanan(nbulan:int):
             #print("{} day input {}".format(i,x_input))
             x_input = x_input.reshape(1,-1)
 
-            yhat = model_bulanan.predict(x_input)
+            yhat = st.session_state["model_bulanan"].predict(x_input)
             #print("{} day output {}".format(i,yhat))
             temp_input.extend(yhat[0].tolist())
             temp_input=temp_input[1:]
@@ -538,7 +514,7 @@ def buat_model_bulanan(nbulan:int):
             i=i+1
         else:
             x_input = x_input.reshape((1, n_steps))
-            yhat = model_bulanan.predict(x_input)
+            yhat = st.session_state["model_bulanan"].predict(x_input)
             temp_input.extend(yhat[0].tolist())
             
             lst_output.extend(yhat.tolist())
@@ -610,8 +586,12 @@ with col1:
             fig.update_yaxes(showgrid=False)
             st.plotly_chart(fig)
             
+            with sqlite3.connect("C:/Users/ASUS/Desktop/Daming/VSC/stock_price_prediction_with_realtime_evaluation/data/database/stock.db") as con:
+                cursor=con.cursor()
+                data_baru.to_sql("forcasting_result_default_harian", con, if_exists="append", index=False)
+                con.commit()
 with col2:
-    if check_model:
+    if check_model_2:
         st.write("Monthly model is a model that is built based on daily stock price data. This model is suitable for long-term investment analysis.")
         nbulan = st.text_input("What months would you want to predict until", key="bulan")
         if nbulan:
@@ -634,3 +614,9 @@ with col2:
             fig.update_xaxes(showgrid=False)
             fig.update_yaxes(showgrid=False)
             st.plotly_chart(fig)
+            
+            with sqlite3.connect("C:/Users/ASUS/Desktop/Daming/VSC/stock_price_prediction_with_realtime_evaluation/data/database/stock.db") as con:
+                cursor=con.cursor()
+                data_baru.to_sql("forcasting_result_default_bulanan", con, if_exists="append", index=False)
+                con.commit()
+                
