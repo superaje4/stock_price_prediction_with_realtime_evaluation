@@ -138,3 +138,4 @@ tzlocal==5.2
 urllib3==2.2.1
 uvicorn==0.28.0
 validators==0.22.0
+webdriver-manager==4.0.1
