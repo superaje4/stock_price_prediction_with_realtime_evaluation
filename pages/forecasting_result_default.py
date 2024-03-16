@@ -25,7 +25,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import sqlite3
 
-
+if "undetect" not in st.session_state:
+    st.session_state["undetect"] = None
 
 hide_pages(["Default Forcast"])
 hide_pages(["Tunned Forcast"])
@@ -95,15 +96,15 @@ def scrap_tambahan():
         options.add_argument('window-size=1920x1080')
         # Mengganti user-agent untuk menghindari deteksi sebagai bot
         options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3')
-        undetect = selenium.webdriver.Chrome(options=options)
+        st.session_state["undetect"] = selenium.webdriver.Chrome(options=options)
         
         for i in formatted_dates:
             url = f"https://www.idx.co.id/primary/TradingSummary/GetStockSummary?length=9999&start=0&date={i}"
-            undetect.get(url)
-            WebDriverWait(undetect, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "body > pre")))
+            st.session_state["undetect"].get(url)
+            WebDriverWait(st.session_state["undetect"], 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "body > pre")))
             time.sleep(0.2)
             
-            page_source = undetect.page_source
+            page_source = st.session_state["undetect"].page_source
             if 'recordsTotal":0' in page_source:
                 # Assuming change_date_format is a function you've defined elsewhere
                 df = pd.DataFrame({"Date": [change_date_format(i) for _ in range(len(stock_code))],
@@ -111,7 +112,7 @@ def scrap_tambahan():
                                 "Close": ["unk" for _ in stock_code]})
                 tmp = pd.concat([tmp, df], ignore_index=True)
             else:
-                data = json.loads(undetect.find_element(By.TAG_NAME, 'pre').text)
+                data = json.loads(st.session_state["undetect"].find_element(By.TAG_NAME, 'pre').text)
                 df = pd.DataFrame(data["data"])
                 # Ensure the column names here match those in the JSON structure
                 df = df[["Date", "StockCode", "Close"]]
@@ -119,7 +120,7 @@ def scrap_tambahan():
 
     finally:
         time.sleep(2)
-        undetect.quit()
+        st.session_state["undetect"].quit()
         tmp=preprocess_data(tmp)
         return tmp
 
