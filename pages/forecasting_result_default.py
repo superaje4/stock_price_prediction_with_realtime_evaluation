@@ -73,6 +73,18 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import json
 import time
+from selenium import webdriver
+import os
+import time
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+
+from webdriver_manager.chrome import ChromeDriverManager
+
 
 # Buat fungsi untuk melakukan scrape
 @st.cache_data
@@ -89,16 +101,16 @@ def scrap_tambahan():
 
     tmp = pd.DataFrame(columns=["Date", "StockCode", "Close"])
     
-    options = Options()
-    options.add_argument('--headless')
-    options.add_argument('--disable-gpu')
-    options.add_argument('window-size=1920x1080')
-    options.add_argument('user-agent=Mozilla/5.0 ...')
-    options.add_argument('--log-level=0')  # Menambahkan logging
+#ser = Service("/home/danielr/.wdm/drivers/chromedriver/linux64/97.0.4692.71/chromedriver")
 
+    op = webdriver.ChromeOptions()
+    op.add_argument("--disable-dev-shm-usage")
+    op.add_argument("--no-sandbox")
+
+   
 
     try:
-        driver = webdriver.Chrome(options=options)  # Pastikan path ChromeDriver sesuai
+        driver = webdriver.Chrome(ChromeDriverManager().install(), options=op)  # Pastikan path ChromeDriver sesuai
         for date in formatted_dates:
             try:
                 url = f"https://www.idx.co.id/primary/TradingSummary/GetStockSummary?length=9999&start=0&date={date}"
