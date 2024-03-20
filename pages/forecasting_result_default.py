@@ -102,13 +102,18 @@ def scrap_tambahan():
     tmp = pd.DataFrame(columns=["Date", "StockCode", "Close"])
     
 
+    # Membuat instance dari Options
     options = Options()
-    options.add_argument('--headless')  # Run Chrome in headless mode (without a visible browser window)
-    options.add_argument('--disable-gpu')  # Disable GPU acceleration (can help with stability)
-    # Menetapkan ukuran jendela
-    options.add_argument('window-size=1920x1080')
-   
-    driver = webdriver.Chrome(executable_path='chromedriver-win64/chromedriver.exe')
+    options.add_argument('--headless')  # Menjalankan Chrome dalam mode headless
+    options.add_argument('--disable-gpu')  # Menonaktifkan akselerasi GPU
+    options.add_argument('window-size=1920x1080')  # Menetapkan ukuran jendela
+
+    # Tentukan path ke ChromeDriver
+    s = Service('chromedriver-win64/chromedriver.exe')
+
+    # Buat instance dari Chrome dengan Service dan Options yang ditentukan
+    driver = webdriver.Chrome(service=s, options=options)
+
 
     try:
         driver = webdriver.Chrome(ChromeDriverManager().install(), options=op)  # Pastikan path ChromeDriver sesuai
