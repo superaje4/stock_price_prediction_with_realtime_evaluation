@@ -94,6 +94,8 @@ def scrap_tambahan():
     options.add_argument('--disable-gpu')
     options.add_argument('window-size=1920x1080')
     options.add_argument('user-agent=Mozilla/5.0 ...')
+    options.add_argument('--log-level=0')  # Menambahkan logging
+
 
     try:
         driver = webdriver.Chrome(options=options)  # Pastikan path ChromeDriver sesuai
