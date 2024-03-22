@@ -149,7 +149,6 @@ def scrap_tambahan():
 def gabung_data(nama_perusahaan):
     df=pd.read_csv("data/processed/clean_database.csv")
     df1=scrap_tambahan()
-    st.write(df1)
     df=pd.concat([df,df1],ignore_index=True)
     
     #spesifikasi namaperusahaan
