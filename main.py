@@ -44,7 +44,7 @@ def scrap_tambahan(perusahaan:str):
     formatted_dates = [date[:8] for date in formatted_dates]
 
 
-    #ubah formated dates ke format 2020-03-02
+    #ubah formated dates ke format s2020-03-02
     def change_date_format(date):
         return f"{date[:4]}-{date[4:6]}-{date[6:]}"
     

@@ -150,7 +150,7 @@ def gabung_data(nama_perusahaan):
     df=pd.read_csv("data/processed/clean_database.csv")
     df1=scrap_tambahan()
     df=pd.concat([df,df1],ignore_index=True)
-    
+    df.drop_duplicates(inplace=True)
     #spesifikasi namaperusahaan
     df_perusahaan=df[df["StockCode"]==nama_perusahaan]
     df_perusahaan["Date"]=df_perusahaan["Date"].astype(str)

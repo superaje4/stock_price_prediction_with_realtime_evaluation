@@ -23,6 +23,7 @@ from keras.callbacks import Callback
 from itertools import cycle
 import plotly.graph_objects as go
 import sqlite3
+import os
 
 hide_pages(["Default Forcast"])
 hide_pages(["Tunned Forcast"])
@@ -122,12 +123,12 @@ def scrap_tambahan():
     tmp=pd.read_csv("data/processed/data_tambahan.csv")
     return tmp
 
-
 @st.cache_data
 def gabung_data(nama_perusahaan):
     df=pd.read_csv("data/processed/clean_database.csv")
     df1=scrap_tambahan()
     df=pd.concat([df,df1],ignore_index=True)
+    df.drop_duplicates(inplace=True)
     
     #spesifikasi namaperusahaan
     df_perusahaan=df[df["StockCode"]==nama_perusahaan]
@@ -156,7 +157,6 @@ def download_link(data_perusahaan):
 # Inisialisasi session state untuk 'data_perusahaan'
 st.session_state['data_perusahaan'] = None
 st.title('Unlock Insights: Advanced Forecasting Models at Your Fingertips')
-
 
 col1,col2=st.columns(2)
 with col1:
@@ -414,7 +414,7 @@ if check_model:
     nhari = st.text_input("What days would you want to predict until", key="hari",value=len(gabung_data(title))-len(ambil_data_train(title)))
     nhari=int(nhari)
     if nhari:
-        data_real=gabung_data(title).copy()
+        data_real=gabung_data(title).copy().drop_duplicates()
         df=ambil_data_train(title)
         data_model_harian=df.copy()
         data_model_harian=data_model_harian.loc[data_model_harian["StockCode"]==title]

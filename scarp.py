@@ -107,8 +107,9 @@ def scrap_tambahan():
 df_tambahan=scrap_tambahan()
 print(df_tambahan)
 #delete data_tambahan.csv
-
+df_tambahan=pd.concat([df_tambahan,pd.read_csv("data/processed/data_tambahan.csv")],ignore_index=True)
 # Delete the existing data_tambahan.csv file
+df_tambahan.drop_duplicates(inplace=True)
 os.remove("data/processed/data_tambahan.csv")
 # Save the new df_tambahan DataFrame to data_tambahan.csv
 df_tambahan.to_csv("data/processed/data_tambahan.csv", index=False)
