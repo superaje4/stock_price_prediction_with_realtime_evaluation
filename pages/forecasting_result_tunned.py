@@ -500,10 +500,13 @@ if check_model:
         # Tampilkan plot
         st.plotly_chart(fig)
         
-        with sqlite3.connect("data/database/stock.db") as con:
-            cursor=con.cursor()
-            result.to_sql("forcasting_result_tunned_harian", con, if_exists="append", index=False)
-            con.commit()
+        try:
+            with sqlite3.connect("data/database/stock.db") as con:
+                cursor=con.cursor()
+                result.to_sql("forcasting_result_tunned_harian", con, if_exists="append", index=False)
+                con.commit()
+        except:
+            pass
 
 
 if check_model_2:

@@ -606,11 +606,13 @@ with col1:
             fig.update_xaxes(showgrid=False)
             fig.update_yaxes(showgrid=False)
             st.plotly_chart(fig)
-            
-            with sqlite3.connect("data/database/stock.db") as con:
-                cursor=con.cursor()
-                data_baru.to_sql("forcasting_result_default_harian", con, if_exists="append", index=False)
-                con.commit()
+            try:
+                with sqlite3.connect("data/database/stock.db") as con:
+                    cursor=con.cursor()
+                    data_baru.to_sql("forcasting_result_default_harian", con, if_exists="append", index=False)
+                    con.commit()
+            except:
+                pass
 with col2:
     if check_model_2:
         st.write("Monthly model is a model that is built based on daily stock price data. This model is suitable for long-term investment analysis.")
@@ -636,8 +638,10 @@ with col2:
             fig.update_yaxes(showgrid=False)
             st.plotly_chart(fig)
             
-            with sqlite3.connect("data/database/stock.db") as con:
-                cursor=con.cursor()
-                data_baru.to_sql("forcasting_result_default_bulanan", con, if_exists="append", index=False)
-                con.commit()
-                
+            try:
+                with sqlite3.connect("data/database/stock.db") as con:
+                    cursor=con.cursor()
+                    data_baru.to_sql("forcasting_result_default_bulanan", con, if_exists="append", index=False)
+                    con.commit()
+            except:
+                pass
