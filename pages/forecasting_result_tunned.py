@@ -207,7 +207,7 @@ class StreamlitProgressCallback(Callback):
         progress = (epoch + 1) / self.max_epochs
         self.progress_bar.progress(progress)
         
-@st.cache_resource
+
 def buat_model_harian():
     # normalisasi data
     df=ambil_data_train(title)
@@ -299,7 +299,7 @@ if "data_real_bulanan" not in st.session_state:
 if "data_model_bulanan" not in st.session_state:
     st.session_state["data_model_bulanan"]=None
     
-@st.cache_resource
+
 def buat_model_bulanan():
     # normalisasi data
     data_real_bulanan=gabung_data(title).copy()
@@ -593,8 +593,10 @@ if check_model_2:
 
         # Tampilkan plot
         st.plotly_chart(fig)
-
-        with sqlite3.connect("data/database/stock.db") as con:
-            cursor=con.cursor()
-            result.to_sql("forcasting_result_tunned_bulanan", con, if_exists="append", index=False)
-            con.commit()
+        try:
+            with sqlite3.connect("data/database/stock.db") as con:
+                cursor=con.cursor()
+                result.to_sql("forcasting_result_tunned_bulanan", con, if_exists="append", index=False)
+                con.commit()
+        except:
+            pass
