@@ -88,60 +88,61 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 @st.cache_data
 def scrap_tambahan():
-    stock_code=pd.read_csv("data/processed/clean_database.csv")["StockCode"].unique()
-    #buat fungsi iteratif
-    start_date = '2024-03-02'
-    now = datetime.now()
-    one_day_before = now - timedelta(days=1)
-    end_date = one_day_before.strftime("%Y-%m-%d")
-    dates = pd.date_range(start=start_date, end=end_date, freq='D')
+    # stock_code=pd.read_csv("data/processed/clean_database.csv")["StockCode"].unique()
+    # #buat fungsi iteratif
+    # start_date = '2024-03-02'
+    # now = datetime.now()
+    # one_day_before = now - timedelta(days=1)
+    # end_date = one_day_before.strftime("%Y-%m-%d")
+    # dates = pd.date_range(start=start_date, end=end_date, freq='D')
 
-    #hilangkan jam detik dan milidetik
-    formatted_dates = [str(date).replace("-","") for date in dates]
-    formatted_dates = [date[:8] for date in formatted_dates]
+    # #hilangkan jam detik dan milidetik
+    # formatted_dates = [str(date).replace("-","") for date in dates]
+    # formatted_dates = [date[:8] for date in formatted_dates]
 
-    #ubah formated dates ke format 2020-03-02
-    def change_date_format(date):
-        return f"{date[:4]}-{date[4:6]}-{date[6:]}"
+    # #ubah formated dates ke format 2020-03-02
+    # def change_date_format(date):
+    #     return f"{date[:4]}-{date[4:6]}-{date[6:]}"
     
     
-    try:
-        tmp = pd.DataFrame(columns=["Date", "StockCode", "Close"])
+    # try:
+    #     tmp = pd.DataFrame(columns=["Date", "StockCode", "Close"])
         
-        options = Options()
-        options.add_argument('--headless')  # Run Chrome in headless mode (without a visible browser window)
-        options.add_argument('--disable-gpu')  # Disable GPU acceleration (can help with stability)
-        # Menetapkan ukuran jendela
-        options.add_argument('window-size=1920x1080')
-        # Mengganti user-agent untuk menghindari deteksi sebagai bot
-        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3')
-        undetect = selenium.webdriver.Chrome(options=options)
+    #     options = Options()
+    #     options.add_argument('--headless')  # Run Chrome in headless mode (without a visible browser window)
+    #     options.add_argument('--disable-gpu')  # Disable GPU acceleration (can help with stability)
+    #     # Menetapkan ukuran jendela
+    #     options.add_argument('window-size=1920x1080')
+    #     # Mengganti user-agent untuk menghindari deteksi sebagai bot
+    #     options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3')
+    #     undetect = selenium.webdriver.Chrome(options=options)
         
-        for i in formatted_dates:
-            url = f"https://www.idx.co.id/primary/TradingSummary/GetStockSummary?length=9999&start=0&date={i}"
-            undetect.get(url)
-            WebDriverWait(undetect, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "body > pre")))
-            time.sleep(0.2)
+    #     for i in formatted_dates:
+    #         url = f"https://www.idx.co.id/primary/TradingSummary/GetStockSummary?length=9999&start=0&date={i}"
+    #         undetect.get(url)
+    #         WebDriverWait(undetect, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "body > pre")))
+    #         time.sleep(0.2)
             
-            page_source = undetect.page_source
-            if 'recordsTotal":0' in page_source:
-                # Assuming change_date_format is a function you've defined elsewhere
-                df = pd.DataFrame({"Date": [change_date_format(i) for _ in range(len(stock_code))],
-                                "StockCode": list(stock_code),
-                                "Close": ["unk" for _ in stock_code]})
-                tmp = pd.concat([tmp, df], ignore_index=True)
-            else:
-                data = json.loads(undetect.find_element(By.TAG_NAME, 'pre').text)
-                df = pd.DataFrame(data["data"])
-                # Ensure the column names here match those in the JSON structure
-                df = df[["Date", "StockCode", "Close"]]
-                tmp = pd.concat([tmp, df], ignore_index=True)
+    #         page_source = undetect.page_source
+    #         if 'recordsTotal":0' in page_source:
+    #             # Assuming change_date_format is a function you've defined elsewhere
+    #             df = pd.DataFrame({"Date": [change_date_format(i) for _ in range(len(stock_code))],
+    #                             "StockCode": list(stock_code),
+    #                             "Close": ["unk" for _ in stock_code]})
+    #             tmp = pd.concat([tmp, df], ignore_index=True)
+    #         else:
+    #             data = json.loads(undetect.find_element(By.TAG_NAME, 'pre').text)
+    #             df = pd.DataFrame(data["data"])
+    #             # Ensure the column names here match those in the JSON structure
+    #             df = df[["Date", "StockCode", "Close"]]
+    #             tmp = pd.concat([tmp, df], ignore_index=True)
 
-    finally:
-        time.sleep(2)
-        undetect.quit()
-        tmp=preprocess_data(tmp)
-        return tmp
+    # finally:
+    #     time.sleep(2)
+    #     undetect.quit()
+    #     tmp=preprocess_data(tmp)
+    tmp=pd.read_csv("data/processed/data_tambahan.csv")
+    return tmp
 
 
 @st.cache_data
