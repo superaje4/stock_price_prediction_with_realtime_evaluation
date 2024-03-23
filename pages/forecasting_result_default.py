@@ -150,7 +150,7 @@ def gabung_data(nama_perusahaan):
     df=pd.read_csv("data/processed/clean_database.csv")
     df1=scrap_tambahan()
     df=pd.concat([df,df1],ignore_index=True)
-    df.drop_duplicates(inplace=True)
+    
     #spesifikasi namaperusahaan
     df_perusahaan=df[df["StockCode"]==nama_perusahaan]
     df_perusahaan["Date"]=df_perusahaan["Date"].astype(str)
@@ -395,14 +395,14 @@ def buat_model_bulanan():
 col1,col2=st.columns(2)
 with col1:
     check_model=st.checkbox("Build Daily Model",key="harian")
-    if check_model:
-        buat_model_harian()
+if check_model:
+    buat_model_harian()
             
 
 with col2:
     check_model_2=st.checkbox("Build Monthly Model",key="bulanan")
-    if check_model_2:
-        buat_model_bulanan()
+if check_model_2:
+    buat_model_bulanan()
         
 
 def buat_model_harian(nhari:int):
@@ -606,6 +606,7 @@ with col1:
             fig.update_xaxes(showgrid=False)
             fig.update_yaxes(showgrid=False)
             st.plotly_chart(fig)
+            
             try:
                 with sqlite3.connect("data/database/stock.db") as con:
                     cursor=con.cursor()
@@ -613,7 +614,8 @@ with col1:
                     con.commit()
             except:
                 pass
-with col2:
+     
+with col1:
     if check_model_2:
         st.write("Monthly model is a model that is built based on daily stock price data. This model is suitable for long-term investment analysis.")
         nbulan = st.text_input("What months would you want to predict until", key="bulan")
@@ -645,3 +647,4 @@ with col2:
                     con.commit()
             except:
                 pass
+  
